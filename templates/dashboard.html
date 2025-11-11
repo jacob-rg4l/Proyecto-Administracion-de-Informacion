@@ -1,0 +1,593 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - StockTrack{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Estadísticas Principales -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stat-card border-0">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">
+                            Total Productos
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-white" id="total-productos">
+                            {{ dashboard_data.estadisticas_generales.total_productos if dashboard_data and dashboard_data.estadisticas_generales else '---' }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-boxes fa-2x text-white-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stat-card border-0" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">
+                            Valor Inventario
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-white" id="valor-inventario">
+                            S/ {{ "%.2f"|format(dashboard_data.estadisticas_generales.valor_total_inventario) if dashboard_data and dashboard_data.estadisticas_generales.valor_total_inventario else '0.00' }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-dollar-sign fa-2x text-white-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stat-card border-0" style="background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">
+                            Stock Bajo
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-white" id="stock-bajo">
+                            {{ dashboard_data.estadisticas_generales.productos_stock_bajo if dashboard_data and dashboard_data.estadisticas_generales else '---' }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-exclamation-triangle fa-2x text-white-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stat-card border-0" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1">
+                            Alertas Activas
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-white" id="alertas-activas">
+                            {{ dashboard_data.estadisticas_generales.alertas_activas if dashboard_data and dashboard_data.estadisticas_generales else '---' }}
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-bell fa-2x text-white-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Gráfico de Estados de Stock -->
+    <div class="col-xl-8 col-lg-7">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    Estado del Inventario
+                </h6>
+                <div class="dropdown no-arrow">
+                    <a class="dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in">
+                        <div class="dropdown-header">Opciones:</div>
+                        <a class="dropdown-item" href="#" onclick="refreshChart()">Actualizar</a>
+                        <a class="dropdown-item" href="/reportes">Ver Reportes</a>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-area">
+                    <canvas id="stockChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertas Recientes -->
+    <div class="col-xl-4 col-lg-5">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Alertas Recientes
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush" id="alertas-recientes">
+                    {% if alertas %}
+                        {% for alerta in alertas[:5] %}
+                        <div class="list-group-item d-flex justify-content-between align-items-start border-0 px-0">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">{{ alerta.codigo_producto }} - {{ alerta.nombre_producto }}</div>
+                                <small class="text-muted">{{ alerta.mensaje[:60] }}...</small>
+                                <br>
+                                <span class="badge priority-{{ alerta.prioridad }}">{{ alerta.prioridad }}</span>
+                            </div>
+                            <small class="text-muted">{{ alerta.tiempo_transcurrido }}</small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-check-circle fa-2x mb-2"></i>
+                            <p>No hay alertas activas</p>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="text-center mt-3">
+                    <a href="/alertas" class="btn btn-sm btn-primary">
+                        Ver todas las alertas
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Productos con Stock Crítico -->
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Productos con Stock Crítico
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="tabla-productos-criticos">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Producto</th>
+                                <th>Stock Actual</th>
+                                <th>Mínimo</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if dashboard_data and dashboard_data.productos_criticos %}
+                                {% for producto in dashboard_data.productos_criticos %}
+                                <tr>
+                                    <td><code>{{ producto.codigo }}</code></td>
+                                    <td>{{ producto.nombre }}</td>
+                                    <td>
+                                        <span class="badge bg-danger">{{ producto.stock_actual }}</span>
+                                    </td>
+                                    <td>{{ producto.stock_minimo }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                onclick="mostrarMovimiento('{{ producto.codigo }}', 'entrada')">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        No hay productos con stock crítico
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Productos más Movimentados -->
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-exchange-alt me-2"></i>
+                    Productos más Movimentados (30 días)
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="tabla-productos-movimentados">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Movimientos</th>
+                                <th>Cantidad Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if dashboard_data and dashboard_data.productos_movimentados %}
+                                {% for producto in dashboard_data.productos_movimentados[:5] %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">{{ producto.nombre }}</div>
+                                        <small class="text-muted">{{ producto.codigo }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ producto.total_movimientos }}</span>
+                                    </td>
+                                    <td>{{ producto.cantidad_total }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        No hay datos de movimientos
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actividad Reciente -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-history me-2"></i>
+                    Actividad Reciente
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="actividad-reciente">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <p class="mt-2">Cargando actividad reciente...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Registro de Movimiento -->
+<div class="modal fade" id="modalMovimiento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar Movimiento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formMovimiento">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="producto-movimiento" class="form-label">Producto</label>
+                        <input type="text" class="form-control" id="producto-movimiento" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tipo-movimiento" class="form-label">Tipo de Movimiento</label>
+                        <select class="form-select" id="tipo-movimiento" required>
+                            <option value="">Seleccionar tipo</option>
+                            <option value="entrada">Entrada</option>
+                            <option value="salida">Salida</option>
+                            <option value="ajuste">Ajuste</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cantidad-movimiento" class="form-label">Cantidad</label>
+                        <input type="number" class="form-control" id="cantidad-movimiento" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="motivo-movimiento" class="form-label">Motivo</label>
+                        <textarea class="form-control" id="motivo-movimiento" rows="3" placeholder="Descripción del movimiento"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Registrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let stockChart = null;
+
+// Inicializar dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    initializeChart();
+    loadActividadReciente();
+    updateAlertasCount();
+});
+
+// Inicializar gráfico de stock
+function initializeChart() {
+    const ctx = document.getElementById('stockChart').getContext('2d');
+    
+    // Datos por defecto
+    const data = {
+        labels: ['Normal', 'Bajo', 'Crítico', 'Alto'],
+        datasets: [{
+            data: [0, 0, 0, 0],
+            backgroundColor: [
+                '#28a745',
+                '#ffc107', 
+                '#dc3545',
+                '#17a2b8'
+            ],
+            borderWidth: 0
+        }]
+    };
+    
+    const config = {
+        type: 'doughnut',
+        data: data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            },
+            cutout: '60%',
+        }
+    };
+    
+    stockChart = new Chart(ctx, config);
+    
+    // Cargar datos reales
+    refreshChart();
+}
+
+// Actualizar gráfico con datos del servidor
+function refreshChart() {
+    fetch('/api/reportes/dashboard')
+        .then(response => response.json())
+        .then(data => {
+            if (data.estadisticas_generales) {
+                const stats = data.estadisticas_generales;
+                const productosData = [
+                    stats.productos_normales || 0,
+                    stats.productos_stock_bajo || 0, 
+                    stats.productos_agotados || 0,
+                    0 // Alto stock (se calcularía desde productos con mucho stock)
+                ];
+                
+                stockChart.data.datasets[0].data = productosData;
+                stockChart.update();
+            }
+        })
+        .catch(error => {
+            console.error('Error al cargar datos del dashboard:', error);
+        });
+}
+
+// Mostrar modal de movimiento
+function mostrarMovimiento(codigoProducto, tipo = 'entrada') {
+    document.getElementById('producto-movimiento').value = codigoProducto;
+    document.getElementById('tipo-movimiento').value = tipo;
+    document.getElementById('modalMovimiento').querySelector('.modal-title').textContent = 
+        `Registrar ${tipo.charAt(0).toUpperCase() + tipo.slice(1)}`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalMovimiento'));
+    modal.show();
+}
+
+// Manejar envío del formulario de movimiento
+document.getElementById('formMovimiento').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const productoCodigo = document.getElementById('producto-movimiento').value;
+    const tipoMovimiento = document.getElementById('tipo-movimiento').value;
+    const cantidad = document.getElementById('cantidad-movimiento').value;
+    const motivo = document.getElementById('motivo-movimiento').value;
+    
+    // Simular envío (en producción, hacer fetch real al API)
+    showAlert('Movimiento registrado exitosamente', 'success');
+    bootstrap.Modal.getInstance(document.getElementById('modalMovimiento')).hide();
+    
+    // Limpiar formulario
+    this.reset();
+    
+    // Actualizar dashboard
+    setTimeout(() => {
+        location.reload();
+    }, 1000);
+});
+
+// Cargar actividad reciente
+function loadActividadReciente() {
+    // Simular carga de actividad (en producción, hacer fetch real)
+    setTimeout(() => {
+        const actividadHtml = `
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-marker bg-primary"></div>
+                    <div class="timeline-content">
+                        <h6 class="timeline-title">Entrada registrada</h6>
+                        <p class="timeline-description">Producto: LAPTOP-001 - Cantidad: 5 unidades</p>
+                        <small class="text-muted">Hace 5 minutos</small>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-marker bg-warning"></div>
+                    <div class="timeline-content">
+                        <h6 class="timeline-title">Alerta de stock bajo</h6>
+                        <p class="timeline-description">Producto: MOUSE-001 ha alcanzado stock mínimo</p>
+                        <small class="text-muted">Hace 15 minutos</small>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-marker bg-info"></div>
+                    <div class="timeline-content">
+                        <h6 class="timeline-title">Producto creado</h6>
+                        <p class="timeline-description">Nuevo producto: TECLADO-001 agregado al inventario</p>
+                        <small class="text-muted">Hace 1 hora</small>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.getElementById('actividad-reciente').innerHTML = actividadHtml;
+    }, 1500);
+}
+
+// Actualizar contador de alertas
+function updateAlertasCount() {
+    fetch('/api/alertas/activas')
+        .then(response => response.json())
+        .then(data => {
+            const count = data.total_alertas || 0;
+            document.getElementById('alertas-count').textContent = count;
+        })
+        .catch(error => {
+            console.error('Error al actualizar contador de alertas:', error);
+        });
+}
+
+// Mostrar alerta temporal
+function showAlert(message, type = 'info') {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-info';
+    const alertHtml = `
+        <div class="alert ${alertClass} alert-dismissible fade show position-fixed" 
+             style="top: 20px; right: 20px; z-index: 9999;" role="alert">
+            <i class="fas fa-${type === 'success' ? 'check' : 'info'}-circle me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', alertHtml);
+    
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+        const alert = document.querySelector('.alert.position-fixed:last-child');
+        if (alert) {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }
+    }, 3000);
+}
+
+// Auto-refresh dashboard every 30 seconds
+setInterval(() => {
+    refreshChart();
+    updateAlertasCount();
+}, 30000);
+</script>
+
+<style>
+.chart-area {
+    position: relative;
+    height: 20rem;
+    width: 100%;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e3e6f0;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -2rem;
+    top: 0.25rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    z-index: 1;
+}
+
+.timeline-content {
+    padding-left: 1rem;
+}
+
+.timeline-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.timeline-description {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+}
+
+.priority-alta { background-color: var(--danger-color); }
+.priority-media { background-color: var(--warning-color); }
+.priority-baja { background-color: var(--info-color); }
+.priority-critica { background-color: #6f42c1; }
+
+@media (max-width: 768px) {
+    .chart-area {
+        height: 15rem;
+    }
+}
+</style>
+{% endblock %}
